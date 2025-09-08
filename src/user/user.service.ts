@@ -11,9 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from 'utilitis/enums';
 import { RequestWithCookies } from 'utilitis/interface';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import * as fs from 'fs';
-import * as path from 'path';
-import { Buffer } from 'buffer';
+import axios from 'axios';
 
 @Injectable()
 export class UserService {
@@ -37,35 +35,63 @@ export class UserService {
   };
   //============================================================================
   // Register a new user
-  public async Register(registerUserDto:RegisterUserDto,lang: 'en' | 'ar' = 'en' ) {
+  public async Register(registerUserDto: RegisterUserDto, lang: 'en' | 'ar' = 'en') {
     lang = ['en', 'ar'].includes(lang) ? lang : 'en';
-    const { fullName } = registerUserDto;
+    const { fullName, recaptchaToken } = registerUserDto;
     const errors: { field: string; message: string }[] = [];
-    if (!fullName || typeof fullName !== 'string') {
-      const msg = errors.push({field:'fullName',message:lang === 'ar'
-            ? 'اسم المستخدم مطلوب ويجب أن يكون نصًا'
-            : 'Username is required and must be a string',
+    // Check reCAPTCHA 
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
+    const { data } = await axios.post(verifyUrl);
+    if (!data.success) {
+      throw new BadRequestException({
+        message: lang === 'ar'
+          ? 'فشل التحقق من أنك لست روبوتاً'
+          : 'Failed to verify reCAPTCHA',
       });
     }
+
+    // ✅ تحقق من اسم المستخدم
+    if (!fullName || typeof fullName !== 'string') {
+      errors.push({
+        field: 'fullName',
+        message: lang === 'ar'
+          ? 'اسم المستخدم مطلوب ويجب أن يكون نصًا'
+          : 'Username is required and must be a string',
+      });
+    }
+
     if (errors.length > 0) {
       throw new BadRequestException({
-        message:
-          lang === 'ar'
-            ? 'يوجد أخطاء في البيانات المُدخلة'
-            : 'There are validation errors',
+        message: lang === 'ar'
+          ? 'يوجد أخطاء في البيانات المُدخلة'
+          : 'There are validation errors',
         errors,
       });
     }
-    // نعمل lowercase فقط
+
+    // ✅ تحويل الاسم إلى lowercase قبل التخزين
     registerUserDto.fullName = fullName.toLowerCase();
 
+    // ✅ تابع تسجيل المستخدم
     return await this.authProvider.Register(registerUserDto, lang);
-  };
+  }
   //============================================================================
   // Log in a user
   public async Login(loginDto: LoginDto,response: Response,lang: 'en' | 'ar' = 'en') {
       lang=['en','ar'].includes(lang)?lang:'en';
-
+      const  {recaptchaToken}  = loginDto;
+      // Check reCAPTCHA 
+      const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+      const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
+      const { data } = await axios.post(verifyUrl);
+      if (!data.success) {
+        throw new BadRequestException({
+        message: lang === 'ar'
+        ? 'فشل التحقق من أنك لست روبوتاً'
+        : 'Failed to verify reCAPTCHA',
+    });
+  }
       return await this.authProvider.Login(loginDto, response,lang);
   };
   //============================================================================
@@ -212,8 +238,20 @@ export class UserService {
   };
   //============================================================================
   // Send a reset password link to user's email
-  public async sendRestPassword(email: string,lang: 'en' | 'ar' = 'en') {
-            lang=['en','ar'].includes(lang)?lang:'en';
+  public async sendRestPassword(ForgotPasswordDto,lang: 'en' | 'ar' = 'en') {
+      lang=['en','ar'].includes(lang)?lang:'en';
+      const {email,recaptchaToken}   = ForgotPasswordDto;
+      // Check reCAPTCHA 
+      const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+      const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${recaptchaToken}`;
+      const { data } = await axios.post(verifyUrl);
+      if (!data.success) {
+        throw new BadRequestException({
+        message: lang === 'ar'
+        ? 'فشل التحقق من أنك لست روبوتاً'
+        : 'Failed to verify reCAPTCHA',
+    });
+  }
       return await this.authProvider.SendResetPasswordCode(email,lang);
   };
   //============================================================================

@@ -97,7 +97,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: 'Password reset email sent' })
   public forgotPassword(@Body() body: ForgotPasswordDto, @Req() req: any) {
     const lang = req.lang || 'en';
-    return this.userService.sendRestPassword(body.email, lang);
+    return this.userService.sendRestPassword(body, lang);
   }
   //============================================================================
   //Reset password using code/token [Public]
