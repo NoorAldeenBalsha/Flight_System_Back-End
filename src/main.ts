@@ -47,7 +47,25 @@ async function bootstrap() {
     }
   });
   //========================================================================================
-  app.enableCors();
+   app.enableCors({
+  origin: [
+    'http://localhost:3000',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'lang',
+    'language',
+    'Accept',
+  ],
+  exposedHeaders: [
+    'Set-Cookie',
+    'Authorization',
+    'lang',
+  ],
+  credentials: true,
+});
   //========================================================================================
   //JSON & URL-encoded  زيادة الحد الأقصى لحجم
   app.use(bodyParser.json({ limit: '50mb' }));

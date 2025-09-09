@@ -43,6 +43,7 @@ export class AuthProvider{
             : 'User email is not a valid email address',
       });
     }
+
     // تحقق من تكرار البريد الإلكتروني
     if (existingEmailUser) {
       errors.push({
@@ -53,6 +54,7 @@ export class AuthProvider{
             : 'Email is already registered',
       });
     }
+
     // تحقق من اسم المستخدم
     if (!fullName || typeof fullName !== 'string') {
       errors.push({
@@ -74,6 +76,7 @@ export class AuthProvider{
         });
       }
     }
+
     // تحقق من كلمة المرور
     if (typeof password !== 'string' || password.length < 6) {
       errors.push({
@@ -84,6 +87,7 @@ export class AuthProvider{
             : 'Password must be at least 6 characters long',
       });
     }
+
     // إذا كان هناك أخطاء، أظهر أول خطأ فقط مع رسالته الخاصة
     if (errors.length > 0) {
       throw new BadRequestException({
@@ -91,8 +95,10 @@ export class AuthProvider{
         errors: [errors[0]],
       });
     }
+
     // هاش كلمة المرور
     const hashedPassword = await this.hashPasswword(password);
+
     // إنشاء المستخدم
     let newUser = new this.userModul({
       ...registerUserDto,
@@ -108,12 +114,6 @@ export class AuthProvider{
     );
 
     await this.mailService.sendVerifyEmailTemplate(email, link);
-
-    // استدعاء بيانات المستخدم الجديد
-    /*const userRegisterData = await this.userService.getCurrentUser(
-      newUser._id,
-      lang,
-    );*/
 
     const msg =
       lang === 'ar'
@@ -142,23 +142,23 @@ export class AuthProvider{
     }
     //التحقق إذا كان المستخدم موجود
     const userFromDB = await this.userModul.findOne({ email });
-if (!userFromDB) {
-  throw new BadRequestException({
-    message:
-      lang === 'ar'
-        ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
-        : 'Invalid email or password',
-    errors: [
-      {
-        field: 'email',
+    if (!userFromDB) {
+      throw new BadRequestException({
         message:
           lang === 'ar'
             ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
             : 'Invalid email or password',
-      },
-    ],
-  });
-}
+        errors: [
+          {
+            field: 'email',
+            message:
+              lang === 'ar'
+                ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
+                : 'Invalid email or password',
+          },
+        ],
+      });
+    }
 
     //  التحقق من صحة كلمة المرور
     const isPasswordValid = await bcrypt.compare(password, userFromDB.password);
@@ -188,23 +188,24 @@ if (!userFromDB) {
       id: userFromDB._id,
       userType: userFromDB.role,
     });
-    const refreshToken = await this.generateRefreshToken({
+    const RefreshToken = await this.generateRefreshToken({
       id: userFromDB._id,
       userType: userFromDB.role,
     });
 
-    response.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      sameSite: 'none',
-      secure: true,
-      path: '/',
-      maxAge: 60 * 60 * 1000,
-    });
+      const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+
+      response.cookie('refresh_token', RefreshToken, {
+        httpOnly: true,
+        sameSite: isProduction ? 'strict' : 'lax',
+        secure: isProduction, // 🔥 بالـ localhost = false, بالسيرفر = true
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
     const userLoginData = await this.userService.getCurrentUser(
       userFromDB._id,
       lang,
     );
-    return { accessToken: AccessToken, userData: userLoginData };
+    return { accessToken: AccessToken ,refreshToken: RefreshToken ,userData: userLoginData };
   };
   //============================================================================
   //This one for refresh token
@@ -241,9 +242,8 @@ if (!userFromDB) {
       // 2. حفظ الـ refresh_token الجديد في الكوكيز
       response.cookie('refresh_token', newRefreshToken, {
         httpOnly: true,
-        sameSite: 'none',
+        sameSite: 'strict',
         secure: true,
-        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 أيام
       });
 
@@ -359,7 +359,9 @@ if (!userFromDB) {
   };
   //============================================================================
   private generateJWT(payload: JWTPayloadType): Promise<string> {
-    return this.jwtService.signAsync(payload);
+    return this.jwtService.signAsync(payload ,{
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),});
   };
   //============================================================================
   private async generateRefreshToken(payload: JWTPayloadType): Promise<string> {
