@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiExcludeEndpoint, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from './decorator/current-user.decorator';
 import { UserService } from './user.service';
@@ -16,11 +16,16 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import type { RequestWithCookies } from 'utilitis/interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { AuthProvider } from './auth/auth.provider';
+import { GoogleAuthGuard } from './guard/google-auth.guard';
 
 @ApiTags('Users')
 @Controller('api/user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly authProvider: AuthProvider
+  ) {}
   //============================================================================
   //Register a new user [Public]
   @Post('auth/register')
@@ -62,6 +67,50 @@ export class UserController {
   ) {
     const lang = req.lang || 'en';
     return this.userService.getCurrentUser(userPayload.id, lang);
+  }
+  //============================================================================
+  //Login with google account
+  @Post('google-login')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(
+    @Body('credential') credential: string,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    const lang = req.headers['lang'] === 'ar' || req.headers['language'] === 'ar' ? 'ar' : 'en';
+
+    if (!credential) {
+      throw new BadRequestException(
+        lang === 'ar' ? 'رمز جوجل مطلوب' : 'Google token is required',
+      );
+    }
+
+    try {
+      const loginData = await this.userService.loginWithGoogle(credential, res);
+      return {
+        message: lang === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login successful',
+        accessToken: loginData.accessToken,
+        userData: {
+          fullName: loginData.user.fullName,
+          email: loginData.user.email,
+          picture: loginData.user.picture,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(error.response || error.message);
+    }
+  } 
+  //============================================================================
+  //  Callback  Google
+  @Get('google/callback')
+  @UseGuards(GoogleAuthGuard)
+  async googleAuthRedirect(
+     @Res({ passthrough: true }) res: Response,
+    @Req() req
+   ) {
+    const data = await this.userService.loginWithGoogle(req.user,res);
+
+    return this.userService.loginWithGoogle(req.user,res);
   }
   //============================================================================
   //Logout user and clear the refresh token cookie [Public]

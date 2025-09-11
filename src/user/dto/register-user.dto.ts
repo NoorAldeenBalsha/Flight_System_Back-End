@@ -52,6 +52,11 @@ export class RegisterUserDto{
   @IsString()
   recaptchaToken:string;
   //============================================================================
+  @ApiProperty({ description: 'Your Picture', required: false })
+  @IsString()
+  @IsOptional()
+  picture?: string;
+  //============================================================================
 
   
 }

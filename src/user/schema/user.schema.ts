@@ -47,7 +47,10 @@ export class User {
   //============================================================================
   @Prop({ type: String,required: false,default: null })
   verificationToken?: string | null;
-
+  //============================================================================
+  @Prop({ required: false })
+  picture?: string;
+  //============================================================================
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

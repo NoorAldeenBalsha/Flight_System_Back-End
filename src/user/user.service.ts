@@ -12,14 +12,18 @@ import { UserRole } from 'utilitis/enums';
 import { RequestWithCookies } from 'utilitis/interface';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import axios from 'axios';
+import { JwtService } from '@nestjs/jwt';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class UserService {
+  private client: OAuth2Client;
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
     private readonly authProvider: AuthProvider,
-  ) {}
+    private readonly jwtService: JwtService
+  ) {this.client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);}
   //============================================================================
   //This for language of role
   private roleTranslations = {
@@ -75,7 +79,7 @@ export class UserService {
 
     // ✅ تابع تسجيل المستخدم
     return await this.authProvider.Register(registerUserDto, lang);
-  }
+  };
   //============================================================================
   // Log in a user
   public async Login(loginDto: LoginDto,response: Response,lang: 'en' | 'ar' = 'en') {
@@ -93,6 +97,73 @@ export class UserService {
     });
   }
       return await this.authProvider.Login(loginDto, response,lang);
+  };
+  //============================================================================
+  //verify Google Token
+  async verifyGoogleToken(token: string): Promise<any> {
+    const googleVerifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${token}`;
+    const response = await fetch(googleVerifyUrl);
+    const data = await response.json();
+
+    if (!data || data.error_description) {
+      throw new UnauthorizedException({
+        ar: 'رمز جوجل غير صالح',
+        en: 'Invalid Google token',
+      });
+    }
+
+    return {
+      email: data.email,
+      fullName: data.name,
+      picture: data.picture,
+      googleId: data.sub,
+    };
+  };
+  //============================================================================
+  //find Or Create Google User
+  async findOrCreateGoogleUser(
+    userData: { email: string; fullName: string; picture?: string },
+    res: Response, 
+  ): Promise<{ accessToken: string; refreshToken: string; user: User }> {
+    let user = await this.userModel.findOne({ email: userData.email });
+
+    if (!user) {
+      const registerUserDto: Partial<RegisterUserDto> = {
+        email: userData.email,
+        fullName: userData.fullName,
+        picture: userData.picture,
+        password: 'GOOGLE_AUTH',
+        recaptchaToken: 'GOOGLE_AUTH',
+      };
+      user = await this.userModel.create(registerUserDto);
+    }
+
+    const payload: JWTPayloadType = { id: user._id, userType: user.role || 'user' };
+    const accessToken = await this.authProvider.generateJWT(payload);
+    const refreshToken = await this.authProvider.generateRefreshToken(payload);
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { accessToken, refreshToken, user };
+  };
+  //============================================================================
+  //login With Google
+  async loginWithGoogle(token: string, res: Response) {
+    try {
+      const payload = await this.verifyGoogleToken(token);
+      const loginData = await this.findOrCreateGoogleUser(payload, res);
+      return loginData;
+    } catch (err) {
+      throw new BadRequestException({
+        ar: 'فشل تسجيل الدخول عبر جوجل',
+        en: 'Google login failed',
+      });
+    }
   };
   //============================================================================
   // Log out the current user

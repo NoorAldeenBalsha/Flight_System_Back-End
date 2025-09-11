@@ -7,11 +7,15 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schema/user.schema';
 import { DatabaseModule } from 'src/db/database.module';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService ,ConfigModule} from '@nestjs/config';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './strategies/jwt.stategy';
+import { GoogleStrategy } from './strategies/google.strategy';
+
 
 @Module({
   controllers: [UserController],
-  providers: [UserService, AuthProvider],
+  providers: [UserService, AuthProvider, JwtStrategy, GoogleStrategy],
   imports: [
     DatabaseModule,
     MailModule,
@@ -24,6 +28,16 @@ import { ConfigService } from '@nestjs/config';
         signOptions: { expiresIn: ConfigService.get<string>('JWT_EXPIRES_IN') },
       }),
     }),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN') || '1d' },
+      }),
+    }),
+    ConfigModule,
   ],
   exports: [UserService, JwtModule],
 })

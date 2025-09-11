@@ -358,13 +358,13 @@ export class AuthProvider{
     return await bcrypt.hash(password, salt);
   };
   //============================================================================
-  private generateJWT(payload: JWTPayloadType): Promise<string> {
+  public generateJWT(payload: JWTPayloadType): Promise<string> {
     return this.jwtService.signAsync(payload ,{
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: this.configService.get<string>('JWT_EXPIRES_IN'),});
   };
   //============================================================================
-  private async generateRefreshToken(payload: JWTPayloadType): Promise<string> {
+  public async generateRefreshToken(payload: JWTPayloadType): Promise<string> {
     return await this.jwtService.signAsync(payload,{
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN'),
