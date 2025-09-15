@@ -24,7 +24,6 @@ import { GoogleAuthGuard } from './guard/google-auth.guard';
 export class UserController {
   constructor(
     private readonly userService: UserService,
-    private readonly authProvider: AuthProvider
   ) {}
   //============================================================================
   //Register a new user [Public]
@@ -72,6 +71,8 @@ export class UserController {
   //Login with google account
   @Post('google-login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with google account' })
+  @ApiResponse({ status: 200, description: 'Operation is success' })
   async googleLogin(
     @Body('credential') credential: string,
     @Res({ passthrough: true }) res: Response,
@@ -104,6 +105,8 @@ export class UserController {
   //  Callback  Google
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Callback  Google' })
+  @ApiResponse({ status: 200, description: 'Operation is success' })
   async googleAuthRedirect(
      @Res({ passthrough: true }) res: Response,
     @Req() req
@@ -192,10 +195,9 @@ export class UserController {
     return this.userService.getAllUsers(+page, +limit, search, role, lang);
   }
   //============================================================================
-  //Update user data [Admin only]
+  //Update user data [Admin or current user]
   @Patch('update/:id')
-  @UseGuards(AuthGuard, AuthRolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard)
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Update user information (Admin only)' })
   @ApiResponse({ status: 200, description: 'User updated successfully' })

@@ -13,17 +13,15 @@ import { RequestWithCookies } from 'utilitis/interface';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import axios from 'axios';
 import { JwtService } from '@nestjs/jwt';
-import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class UserService {
-  private client: OAuth2Client;
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
     private readonly authProvider: AuthProvider,
     private readonly jwtService: JwtService
-  ) {this.client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);}
+  ) {}
   //============================================================================
   //This for language of role
   private roleTranslations = {
@@ -197,10 +195,19 @@ export class UserService {
         throw new NotFoundException(msg);
   }
   return {
-    userName: user.fullName,
+    _id: user._id,
+    fullName: user.fullName,
     role: this.roleTranslations[user.role]?.[lang] || user.role,
     gender: this.genderTranslations[user.gender]?.[lang] || user.gender,
-    userEmail:user.email
+    email:user.email,
+    phone:user.phone,
+    passportNumber:user.passportNumber,
+    picture:user.picture,
+    lastLogin:user.lastLogin,
+    birthCountry:user.birthCountry,
+    residenceCountry:user.residenceCountry,
+    bio:user.bio,
+    coverPicture:user.coverPicture,
   };
   };
   //============================================================================
@@ -233,34 +240,52 @@ export class UserService {
   };
   //============================================================================
   // Update user information
-  public async update(id:Types.ObjectId,currentUser:JWTPayloadType,updateUserDto:UpdateUserDto,lang:'en'|'ar'='en',): Promise<User> {
-    lang = ['en', 'ar'].includes(lang) ? lang : 'en';
+  public async update(
+  id: Types.ObjectId,
+  currentUser: JWTPayloadType,
+  updateUserDto: UpdateUserDto,
+  lang: 'en' | 'ar' = 'en',
+): Promise<User> {
+  lang = ['en', 'ar'].includes(lang) ? lang : 'en';
+  if (currentUser.userType !== UserRole.ADMIN && currentUser.id.toString()!==id.toString()) {
+    const msg =
+      lang === 'ar'
+        ? 'غير مسموح لك بالتعديل'
+        : 'You are not authorized to perform this action';
+    throw new UnauthorizedException(msg);
+  }
 
-    if (currentUser.userType !== UserRole.ADMIN) {
-      const msg =
-        lang === 'ar'
-          ? 'غير مسموح لك بالتعديل'
-          : 'You are not authorized to perform this action';
-      throw new UnauthorizedException(msg);
+  const userFromDB = await this.userModel.findById(id);
+  if (!userFromDB) {
+    const msg = lang === 'ar' ? 'المستخدم غير موجود' : 'User not found';
+    throw new NotFoundException(msg);
+  }
+
+  // حدث كل الحقول الممكنة باستثناء كلمة المرور
+  const fieldsToUpdate = [
+  'fullName',
+  'email',
+  'phone',
+  'birthCountry',
+  'residenceCountry',
+  'gender',
+  'role',
+  'bio',
+  'passportNumber',
+  'coverPicture',
+  'picture',
+  'lastLogin',
+  'dateOfBirth',
+];
+
+  fieldsToUpdate.forEach((field) => {
+    if (updateUserDto[field] !== undefined) {
+      userFromDB[field] = updateUserDto[field];
     }
+  });
 
-    const userFromDB = await this.userModel.findById(id);
-    if (!userFromDB) {
-      const msg = lang === 'ar' ? 'المستخدم غير موجود' : 'User not found';
-      throw new NotFoundException(msg);
-    }
-
-    const { fullName, password, gender, phone } = updateUserDto;
-
-    if (fullName) userFromDB.fullName = fullName;
-    if (gender) userFromDB.gender = gender;
-    if (phone) userFromDB.phone = phone;
-    if (password) {
-      userFromDB.password = await this.authProvider.hashPasswword(password);
-    }
-
-    return await userFromDB.save();
-  };
+  return await userFromDB.save();
+}
   //============================================================================
   // Remove (delete) a user
   public async deleteUser(id: Types.ObjectId,currentUser: JWTPayloadType,lang: 'en' | 'ar' = 'en',):Promise<{ message: string }> {

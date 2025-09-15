@@ -51,6 +51,18 @@ export class User {
   @Prop({ required: false })
   picture?: string;
   //============================================================================
+  @Prop({ required: false })
+  birthCountry?: string;
+  //============================================================================
+  @Prop({ required: false })
+  residenceCountry?: string;
+  //============================================================================
+  @Prop({ required: false })
+  bio?: string;
+  //============================================================================  
+  @Prop({ required: false })
+  coverPicture?: string;
+  //============================================================================ 
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -57,6 +57,23 @@ export class RegisterUserDto{
   @IsOptional()
   picture?: string;
   //============================================================================
-
-  
+  @ApiProperty({ description: 'Birth Country', required: false })
+  @IsString()
+  @IsOptional()
+  birthCountry ?: string;
+  //============================================================================
+  @ApiProperty({ description: 'Residence Country', required: false })
+  @IsString()
+  @IsOptional()
+  residenceCountry ?: string;
+  //============================================================================
+  @ApiProperty({ description: 'Bio', required: false })
+  @IsString()
+  @IsOptional()
+  bio ?: string;
+  //============================================================================
+  @ApiProperty({ description: 'Background Picture', required: false })
+  @IsString()
+  @IsOptional()
+  coverPicture?: string;
 }

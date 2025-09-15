@@ -11,6 +11,7 @@ import { UserModule } from './user/user.module';
     }),
     FlightModule,
     UserModule,
+    
   ],
   controllers: [],
   providers: [],
